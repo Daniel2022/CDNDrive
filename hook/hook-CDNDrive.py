@@ -1,6 +1,6 @@
 from PyInstaller.utils.hooks import collect_all  
 
-
+# 封装用的
 def hook(hook_api):  
     packages = ['CDNDrive']  
     for package in packages:  
