@@ -4,6 +4,9 @@ import math
 from PIL import Image
 from io import BytesIO
 
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True # avoid 'image file is truncated'
+
 class PngEncoder:
 
     def __init__(self):
