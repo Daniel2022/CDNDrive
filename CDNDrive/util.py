@@ -12,7 +12,7 @@ import tempfile
 
 bundle_dir = tempfile.gettempdir()
 cookie_fname = 'cdrive_cookies.json'
-history_fname = 'cdrive_history.json'
+history_dir = 'cdrive_history'
 
 ONE_TB = 1 << 40
 ONE_GB = 1 << 30
@@ -63,24 +63,52 @@ def image_download(url):
     return b"".join(content)
     
 
-def read_history(site=None):
-    fname = path.join(bundle_dir, history_fname)
-    if not path.exists(fname):
-        return {}
-    with open(fname, encoding="utf-8") as f:
-        history = json.loads(f.read())
-    if not site:
-        return history
-    else:
-        return history.get(site, {})
+def safe_mkdir(dir):
+    try: os.mkdir(dir)
+    except: pass
 
-def write_history(first_4mb_sha1, meta_dict, site, url):
-    history = read_history()
-    history.setdefault(site, {})
-    history[site][first_4mb_sha1] = meta_dict
-    history[site][first_4mb_sha1]['url'] = url
-    with open(path.join(bundle_dir, history_fname), "w", encoding="utf-8") as f:
-        f.write(json.dumps(history, ensure_ascii=False, indent=2))
+def read_history_all(site=None):
+    dir = path.join(bundle_dir, history_dir)
+    if not path.isdir(dir):
+        return {}
+    res = {}
+    fnames = os.listdir(dir)
+    for fname in fnames:
+        tmp = fname.replace('.json', '').split('-')
+        if len(tmp) < 2: continue
+        cur_site, f4m_sha1 = tmp[0], tmp[1]
+        if site and cur_site != site: continue
+        fname = path.join(dir, fname)
+        try:
+            cont = json.loads(open(fname, encoding="utf-8").read())
+        except:
+            continue
+        res.setdefault(cur_site, {})
+        res[cur_site][f4m_sha1] = cont
+        
+    if site:
+        return res.get(site, {})
+    else:
+        return res
+
+def read_history(site=None, f4m_sha1=None):
+    if site is None or f4m_sha1 is None:
+        return read_history_all(site)
+    fname = path.join(bundle_dir, history_dir, f'{site}-{f4m_sha1}.json')
+    if not path.isfile(fname):
+        return None
+    try:
+        return json.loads(open(fname, encoding="utf-8").read())
+    except:
+        return None
+
+def write_history(f4m_sha1, meta_dict, site, url):
+    dir = path.join(bundle_dir, history_dir)
+    safe_mkdir(dir)
+    fname = path.join(dir, f'{site}-{f4m_sha1}.json')
+    meta_dict['url'] = url
+    open(fname, 'w', encoding='utf-8').write(
+        json.dumps(meta_dict, ensure_ascii=False, indent=2))
     
 def read_in_chunk(fname, size=4 * 1024 * 1024, cnt=-1):
     with open(fname, "rb") as f:
@@ -130,8 +158,10 @@ def load_cookies(site=None):
     fname = path.join(bundle_dir, cookie_fname)
     if not path.exists(fname):
         return {}
-    with open(fname, encoding="utf-8") as f:
-        cookies = json.loads(f.read())
+    try:
+        cookies = json.loads(open(fname, encoding="utf-8").read())
+    except:
+        return {}
     if not site: 
         return cookies
     else: 
